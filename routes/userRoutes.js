@@ -35,6 +35,93 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
+// Update user profile (EditProfileScreen)
+router.put('/:userId', async (req, res) => {
+  try {
+    const { age, gender, headline, photos, ...rest } = req.body;
+
+    const profileCompleted =
+      !!age && !!gender && !!headline && Array.isArray(photos) && photos.length > 0;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.userId,
+      {
+        age,
+        gender,
+        headline,
+        photos,
+        ...rest,
+        profileCompleted,
+      },
+      { new: true }
+    );
+
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get recommendations with Second Chance support + gender filtering
+router.get('/:userId/recommendations', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const oppositeGender = user.gender === 'male' ? 'female' : 'male';
+
+    const swipedIds = [
+      ...user.likes.map(String),
+      ...user.matches.map(String),
+    ];
+
+    let candidates = await User.find({
+      _id: { $ne: userId, $nin: swipedIds },
+      gender: oppositeGender,
+    }).select('name age image bio gender');
+
+    candidates = candidates.filter(c => !user.rejected.includes(c._id));
+
+    if (candidates.length > 0) {
+      return res.status(200).json({ users: candidates, secondChance: false });
+    }
+
+    const secondChanceIds = user.rejected.filter(
+      id => !user.secondChanceShown.includes(id)
+    );
+
+    const secondChanceUsers = await User.find({
+      _id: { $in: secondChanceIds },
+      gender: oppositeGender,
+    }).select('name age image bio gender');
+
+    return res.status(200).json({ users: secondChanceUsers, secondChance: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH to mark second chance profile as shown
+router.patch('/:userId/secondChance/:targetId', async (req, res) => {
+  const { userId, targetId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!user.secondChanceShown.includes(targetId)) {
+      user.secondChanceShown.push(targetId);
+      await user.save();
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Handle swipe from one user to another
 router.post('/:userId/swipe', async (req, res) => {
   const { userId } = req.params;
@@ -71,18 +158,13 @@ router.post('/:userId/swipe', async (req, res) => {
 
     } else if (action === 'reject') {
       if (swiper.rejected.includes(targetId)) {
-        return res.status(400).json({ message: 'Already rejected this user twice' });
+        return res.status(400).json({ message: 'Already rejected this user' });
       }
 
-      if (!swiper.rejectedOnce.includes(targetId)) {
-        swiper.rejectedOnce.push(targetId);
-        await swiper.save();
-        return res.status(200).json({ message: 'Rejected once' });
-      } else {
-        swiper.rejected.push(targetId);
-        await swiper.save();
-        return res.status(200).json({ message: 'Rejected permanently' });
-      }
+      swiper.rejected.push(targetId);
+      await swiper.save();
+      return res.status(200).json({ message: 'User rejected' });
+
     } else {
       return res.status(400).json({ message: 'Invalid action' });
     }

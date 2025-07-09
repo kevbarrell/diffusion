@@ -5,10 +5,12 @@ import dotenv from 'dotenv';
 
 import userRoutes from './routes/userRoutes.js';
 import messagesRouter from './routes/messages.js';
+import authRoutes from './routes/auth.js'; // ← Make sure this is AFTER `dotenv.config()`
 
 dotenv.config();
 
-const app = express();
+const app = express(); // ← This must come BEFORE any `app.use(...)`
+
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
@@ -19,6 +21,7 @@ app.use(express.json());
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messagesRouter);
+app.use('/api/auth', authRoutes); // ← Now it's safe to use
 
 // Test route
 app.get('/', (req, res) => {
