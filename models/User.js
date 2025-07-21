@@ -16,13 +16,12 @@ const userSchema = new mongoose.Schema({
 
   // Editable profile fields
   photos: [String],
-  headline: String,
   location: String,
   denomination: String,
   maritalStatus: String,
   drinking: String,
   smoking: String,
-  hobbies: String,
+  hobbies: [String],
   aboutMe: String,
 
   // Tracks if user has saved profile info

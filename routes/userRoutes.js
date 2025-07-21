@@ -38,17 +38,16 @@ router.get('/:userId', async (req, res) => {
 // Update user profile (EditProfileScreen)
 router.put('/:userId', async (req, res) => {
   try {
-    const { age, gender, headline, photos, ...rest } = req.body;
+    const { age, gender, photos, ...rest } = req.body;
 
     const profileCompleted =
-      !!age && !!gender && !!headline && Array.isArray(photos) && photos.length > 0;
+      !!age && !!gender && Array.isArray(photos) && photos.length > 0;
 
     const updatedUser = await User.findByIdAndUpdate(
       req.params.userId,
       {
         age,
         gender,
-        headline,
         photos,
         ...rest,
         profileCompleted,
