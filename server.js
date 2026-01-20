@@ -5,11 +5,11 @@ import dotenv from 'dotenv';
 
 import userRoutes from './routes/userRoutes.js';
 import messagesRouter from './routes/messages.js';
-import authRoutes from './routes/auth.js'; // ← Make sure this is AFTER `dotenv.config()`
+import authRoutes from './routes/auth.js';
 
 dotenv.config();
 
-const app = express(); // ← This must come BEFORE any `app.use(...)`
+const app = express();
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
@@ -21,7 +21,7 @@ app.use(express.json());
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messagesRouter);
-app.use('/api/auth', authRoutes); // ← Now it's safe to use
+app.use('/api/auth', authRoutes);
 
 // Test route
 app.get('/', (req, res) => {
@@ -30,12 +30,13 @@ app.get('/', (req, res) => {
 
 // Connect to MongoDB and start server
 mongoose
-  .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    app.listen(PORT, () =>
+      console.log(`🚀 Server running on port ${PORT}`)
+    );
   })
-  .catch((err) => console.error('❌ MongoDB connection error:', err));
+  .catch((err) =>
+    console.error('❌ MongoDB connection error:', err)
+  );

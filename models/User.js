@@ -1,37 +1,45 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  age: Number,
-  image: { type: String },
-  bio: String,
-  gender: { type: String, enum: ['male', 'female'] },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  matches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  rejected: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  secondChanceShown: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    age: Number,
+    image: { type: String },
+    bio: String,
+    gender: { type: String, enum: ['male', 'female'] },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    matches: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    rejected: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    secondChanceShown: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 
-  // Editable profile fields
-  photos: [String],
-  location: String,
-  denomination: String,
-  maritalStatus: String,
-  drinking: String,
-  smoking: String,
-  hobbies: [String],
-  aboutMe: String,
+    // Editable profile fields
+    photos: [String],
 
-  // Tracks if user has saved profile info
-  profileCompleted: {
-    type: Boolean,
-    default: false
+    // ✅ New: ZIP Code
+    zipCode: { type: String },
+
+    // Keeping your existing fields (you can remove location later if you want)
+    location: String,
+    denomination: String,
+    maritalStatus: String,
+    drinking: String,
+    smoking: String,
+    hobbies: [String],
+    aboutMe: String,
+
+    // Tracks if user has saved profile info
+    profileCompleted: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true
-});
+);
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
