@@ -1,3 +1,4 @@
+// routes/userRoutes.js
 import express from 'express';
 import User from '../models/User.js';
 import { createRequire } from 'module';
@@ -39,6 +40,47 @@ const haversineMiles = (a, b) => {
   return R * c;
 };
 
+// ✅ Centralized shaping so normal + second-chance + crushes match exactly
+const shapeCandidate = (candidate, userCoords) => {
+  const photo0 =
+    Array.isArray(candidate.photos) && candidate.photos.length > 0
+      ? candidate.photos[0]
+      : null;
+
+  const candidateCoords = getZipCoords(candidate.zipCode);
+  const dist = haversineMiles(userCoords, candidateCoords);
+
+  return {
+    _id: candidate._id,
+    name: candidate.name,
+    age: candidate.age,
+    gender: candidate.gender,
+    zipCode: candidate.zipCode,
+
+    image: photo0 || candidate.image,
+    photos: candidate.photos || [],
+
+    bio: candidate.aboutMe || candidate.bio,
+    aboutMe: candidate.aboutMe || null,
+    headline: candidate.headline || null,
+
+    city: candidate.city || null,
+    state: candidate.state || null,
+
+    denomination: candidate.denomination || null,
+    maritalStatus: candidate.maritalStatus || null,
+    hasChildren: candidate.hasChildren || null,
+
+    drinking: candidate.drinking || null,
+    smoking: candidate.smoking || null,
+    hobbies: Array.isArray(candidate.hobbies)
+      ? candidate.hobbies
+      : candidate.hobbies || null,
+
+    distanceMiles: typeof dist === 'number' ? dist : null,
+  };
+};
+
 // Create a user
 router.post('/', async (req, res) => {
   try {
@@ -78,7 +120,9 @@ router.put('/:userId', async (req, res) => {
 
     // ZIP required
     if (!zipCode || !isValidUSZip(zipCode)) {
-      return res.status(400).json({ message: 'Valid 5-digit ZIP code is required.' });
+      return res
+        .status(400)
+        .json({ message: 'Valid 5-digit ZIP code is required.' });
     }
 
     const profileCompleted =
@@ -121,38 +165,38 @@ router.get('/:userId/recommendations', async (req, res) => {
 
     const oppositeGender = user.gender === 'male' ? 'female' : 'male';
 
-    const swipedIds = [
-      ...user.likes.map(String),
-      ...user.matches.map(String),
-    ];
+    const swipedIds = [...user.likes.map(String), ...user.matches.map(String)];
 
     let candidates = await User.find({
       _id: { $ne: userId, $nin: swipedIds },
       gender: oppositeGender,
-    }).select('name age image bio gender photos aboutMe zipCode');
+    }).select(
+      [
+        'name',
+        'age',
+        'image',
+        'bio',
+        'gender',
+        'photos',
+        'aboutMe',
+        'headline',
+        'zipCode',
+        'city',
+        'state',
+        'denomination',
+        'maritalStatus',
+        'hasChildren',
+        'drinking',
+        'smoking',
+        'hobbies',
+      ].join(' ')
+    );
 
     candidates = candidates.filter((c) => !user.rejected.includes(c._id));
 
     const userCoords = getZipCoords(user.zipCode);
 
-    const shaped = candidates.map((c) => {
-      const photo0 = Array.isArray(c.photos) && c.photos.length > 0 ? c.photos[0] : null;
-
-      const candidateCoords = getZipCoords(c.zipCode);
-      const dist = haversineMiles(userCoords, candidateCoords);
-
-      return {
-        _id: c._id,
-        name: c.name,
-        age: c.age,
-        gender: c.gender,
-        zipCode: c.zipCode,
-        image: photo0 || c.image,
-        bio: c.aboutMe || c.bio,
-        photos: c.photos || [],
-        distanceMiles: typeof dist === 'number' ? dist : null,
-      };
-    });
+    const shaped = candidates.map((c) => shapeCandidate(c, userCoords));
 
     if (shaped.length > 0) {
       return res.status(200).json({ users: shaped, secondChance: false });
@@ -165,26 +209,31 @@ router.get('/:userId/recommendations', async (req, res) => {
     const secondChanceUsers = await User.find({
       _id: { $in: secondChanceIds },
       gender: oppositeGender,
-    }).select('name age image bio gender photos aboutMe zipCode');
+    }).select(
+      [
+        'name',
+        'age',
+        'image',
+        'bio',
+        'gender',
+        'photos',
+        'aboutMe',
+        'headline',
+        'zipCode',
+        'city',
+        'state',
+        'denomination',
+        'maritalStatus',
+        'hasChildren',
+        'drinking',
+        'smoking',
+        'hobbies',
+      ].join(' ')
+    );
 
-    const shapedSecond = secondChanceUsers.map((c) => {
-      const photo0 = Array.isArray(c.photos) && c.photos.length > 0 ? c.photos[0] : null;
-
-      const candidateCoords = getZipCoords(c.zipCode);
-      const dist = haversineMiles(userCoords, candidateCoords);
-
-      return {
-        _id: c._id,
-        name: c.name,
-        age: c.age,
-        gender: c.gender,
-        zipCode: c.zipCode,
-        image: photo0 || c.image,
-        bio: c.aboutMe || c.bio,
-        photos: c.photos || [],
-        distanceMiles: typeof dist === 'number' ? dist : null,
-      };
-    });
+    const shapedSecond = secondChanceUsers.map((c) =>
+      shapeCandidate(c, userCoords)
+    );
 
     return res.status(200).json({ users: shapedSecond, secondChance: true });
   } catch (err) {
@@ -206,6 +255,88 @@ router.patch('/:userId/secondChance/:targetId', async (req, res) => {
     }
 
     res.sendStatus(200);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * ✅ NEW: Get "My Crushes" (people I swiped right on)
+ * GET /api/users/:userId/crushes
+ */
+router.get('/:userId/crushes', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findById(userId).populate(
+      'likes',
+      [
+        'name',
+        'age',
+        'image',
+        'bio',
+        'gender',
+        'photos',
+        'aboutMe',
+        'headline',
+        'zipCode',
+        'city',
+        'state',
+        'denomination',
+        'maritalStatus',
+        'hasChildren',
+        'drinking',
+        'smoking',
+        'hobbies',
+      ].join(' ')
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const userCoords = getZipCoords(user.zipCode);
+
+    const shaped = (user.likes || []).map((c) => shapeCandidate(c, userCoords));
+
+    res.status(200).json(shaped);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * ✅ NEW: Remove a crush (un-like)
+ * DELETE /api/users/:userId/crushes/:targetId
+ * - removes targetId from likes
+ * - if they were a match, removes from BOTH users' matches arrays too
+ */
+router.delete('/:userId/crushes/:targetId', async (req, res) => {
+  const { userId, targetId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    const target = await User.findById(targetId);
+
+    if (!user || !target) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // remove like
+    user.likes = (user.likes || []).filter((id) => String(id) !== String(targetId));
+
+    // if they were matched, unmatch both sides
+    const wasMatch =
+      (user.matches || []).some((id) => String(id) === String(targetId)) ||
+      (target.matches || []).some((id) => String(id) === String(userId));
+
+    if (wasMatch) {
+      user.matches = (user.matches || []).filter((id) => String(id) !== String(targetId));
+      target.matches = (target.matches || []).filter((id) => String(id) !== String(userId));
+      await target.save();
+    }
+
+    await user.save();
+
+    res.status(200).json({ message: 'Crush removed', wasMatch });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -233,8 +364,8 @@ router.post('/:userId/swipe', async (req, res) => {
 
       const isMatch = target.likes.includes(userId);
       if (isMatch) {
-        swiper.matches.push(targetId);
-        target.matches.push(userId);
+        if (!swiper.matches.includes(targetId)) swiper.matches.push(targetId);
+        if (!target.matches.includes(userId)) target.matches.push(userId);
 
         await target.save();
         await swiper.save();
@@ -247,11 +378,16 @@ router.post('/:userId/swipe', async (req, res) => {
     }
 
     if (action === 'reject') {
-      if (swiper.rejected.includes(targetId)) {
-        return res.status(400).json({ message: 'Already rejected this user' });
+      // ✅ If they were previously liked/matched, cleanly remove those relationships
+      swiper.likes = (swiper.likes || []).filter((id) => String(id) !== String(targetId));
+      swiper.matches = (swiper.matches || []).filter((id) => String(id) !== String(targetId));
+      target.matches = (target.matches || []).filter((id) => String(id) !== String(userId));
+
+      if (!swiper.rejected.includes(targetId)) {
+        swiper.rejected.push(targetId);
       }
 
-      swiper.rejected.push(targetId);
+      await target.save();
       await swiper.save();
       return res.status(200).json({ message: 'User rejected' });
     }
@@ -267,12 +403,42 @@ router.get('/:userId/matches', async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const user = await User.findById(userId).populate('matches', 'name age image bio');
+    const user = await User.findById(userId).populate(
+      'matches',
+      [
+        'name',
+        'age',
+        'image',
+        'bio',
+        'photos',
+        'aboutMe',
+        'headline',
+        'denomination',
+        'maritalStatus',
+        'hasChildren',
+        'drinking',
+        'smoking',
+        'hobbies',
+        'zipCode',
+      ].join(' ')
+    );
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json(user.matches);
+    const shapedMatches = (user.matches || []).map((m) => {
+      const photo0 =
+        Array.isArray(m.photos) && m.photos.length > 0 ? m.photos[0] : null;
+
+      return {
+        ...m.toObject(),
+        image: photo0 || m.image,
+        bio: m.aboutMe || m.bio,
+      };
+    });
+
+    res.status(200).json(shapedMatches);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

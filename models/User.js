@@ -18,13 +18,14 @@ const userSchema = new mongoose.Schema(
     // Editable profile fields
     photos: [String],
 
-    // ✅ New: ZIP Code
+    // ZIP Code
     zipCode: { type: String },
 
-    // Keeping your existing fields (you can remove location later if you want)
+    // Existing fields
     location: String,
     denomination: String,
     maritalStatus: String,
+    hasChildren: String,
     drinking: String,
     smoking: String,
     hobbies: [String],

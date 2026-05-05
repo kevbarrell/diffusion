@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import userRoutes from './routes/userRoutes.js';
 import messagesRouter from './routes/messages.js';
 import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js'; // ✅ ADDED
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messagesRouter);
 app.use('/api/auth', authRoutes);
+app.use('/api/upload', uploadRoutes); // ✅ ADDED
 
 // Test route
 app.get('/', (req, res) => {
